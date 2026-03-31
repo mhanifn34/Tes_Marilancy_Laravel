@@ -9,37 +9,27 @@ use Illuminate\Support\Facades\Auth;
 
 class WorkspaceController extends Controller
 {
-    // Halaman Workspace buat Freelancer & Klien liat progres
     public function index($jobId)
     {
         $job = Job::with('tasks')->findOrFail($jobId);
         
-        // Hitung progres (jumlah task 'done' / total task) * 100
         $totalTasks = $job->tasks->count();
+        // Perbaikan: Pastikan menggunakan koma (,) bukan titik dua (:)
         $doneTasks = $job->tasks->where('status', 'done')->count();
-        if ($totalTasks > 0) {
-            $progress = ($doneTasks / $totalTasks) * 100;
-        } else {
-            $progress = 0;
-        }
+        $progress = $totalTasks > 0 ? ($doneTasks / $totalTasks) * 100 : 0;
 
         return view('workspace.index', compact('job', 'progress'));
     }
 
-    // Tambah list tugas baru (Cuma bisa buat Freelancer yang diterima)
     public function addTask(Request $request, $jobId)
     {
-        // Validasi input
-        $request->validate([
-            'task_name' => 'required|string|max:255',
-        ]);
+        $request->validate(['task_name' => 'required|string|max:255']);
 
         $job = Job::findOrFail($jobId);
+        $acceptedApp = $job->applications()->where('status', 'accepted')->first();
 
-        // Cek apakah user adalah freelancer yang diterima
-        $acceptedApplication = $job->applications()->where('status', 'accepted')->first();
-        if (!$acceptedApplication || Auth::id() !== $acceptedApplication->freelancer_id) {
-            return redirect()->back()->with('error', 'Kamu nggak terlibat di job ini!');
+        if (!$acceptedApp || Auth::id() !== $acceptedApp->freelancer_id) {
+            return redirect()->back()->with('error', 'Akses ditolak!');
         }
 
         Task::create([
@@ -48,28 +38,24 @@ class WorkspaceController extends Controller
             'status' => 'to_do'
         ]);
 
-        return redirect()->back()->with('success', 'Tugas baru berhasil ditambah!');
+        return redirect()->back()->with('success', 'Tugas berhasil ditambah!');
     }
 
-    // Update status tugas (To Do -> Doing -> Done)
     public function updateTaskStatus(Request $request, $taskId)
     {
-        // Validasi status
-        $request->validate([
-            'status' => 'required|in:to_do,doing,done',
-        ]);
+        $request->validate(['status' => 'required|in:to_do,doing,done']);
 
         $task = Task::findOrFail($taskId);
         $job = $task->job;
+        $acceptedApp = $job->applications()->where('status', 'accepted')->first();
 
-        // Cek akses: client atau freelancer yang diterima
-        $acceptedApplication = $job->applications()->where('status', 'accepted')->first();
-        if (Auth::id() !== $job->client_id && (!$acceptedApplication || Auth::id() !== $acceptedApplication->freelancer_id)) {
-            return redirect()->back()->with('error', 'Kamu nggak terlibat di job ini!');
+        // Cek akses: hanya klien pemilik atau freelancer terpilih
+        if (Auth::id() !== $job->client_id && (!$acceptedApp || Auth::id() !== $acceptedApp->freelancer_id)) {
+            return redirect()->back()->with('error', 'Akses ditolak!');
         }
 
         $task->update(['status' => $request->status]);
 
-        return redirect()->back()->with('success', 'Status tugas diperbarui!');
+        return redirect()->back()->with('success', 'Status diperbarui!');
     }
 }

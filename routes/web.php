@@ -6,22 +6,24 @@ use App\Http\Controllers\WorkspaceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ProfileController;
+use App\Models\Review;
+use App\Models\Job;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes - MariLancy Project (Tugas PPL 2026)
+| Web Routes - MariLancy Project
 |--------------------------------------------------------------------------
 */
 
-// Halaman Landing / List Lowongan buat publik/freelancer
+// Halaman Landing / List Lowongan
 Route::get('/', [JobController::class, 'index'])->name('jobs.index');
 
 // Route Auth Bawaan (Login, Register, Logout)
 Auth::routes();
-Route::get('/profile/edit', function() { return view('profile.edit'); })->name('profile.edit');
-Route::patch('/profile/update', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
 
 // Semua fitur di bawah ini wajib LOGIN dulu
 Route::middleware(['auth'])->group(function () {
@@ -30,53 +32,57 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // 2. Fitur Lowongan (Klien)
+    // 2. Fitur Profil
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
+
+    // 3. Fitur Lowongan (Klien)
     Route::post('/jobs/store', [JobController::class, 'store'])->name('jobs.store');
     
-    // 3. Fitur Lamaran/Bidding (Freelancer)
+    // 4. Fitur Lamaran/Bidding (Freelancer)
     Route::post('/jobs/{id}/apply', [ApplicationController::class, 'apply'])->name('jobs.apply');
     
-    // 4. Fitur Workspace & To-Do List (Manajemen Proyek)
+    // 5. Fitur Workspace & To-Do List (Manajemen Proyek)
     Route::get('/workspace/{jobId}', [WorkspaceController::class, 'index'])->name('workspace.index');
     Route::post('/workspace/{jobId}/add-task', [WorkspaceController::class, 'addTask'])->name('workspace.add_task');
     Route::patch('/tasks/{taskId}/update', [WorkspaceController::class, 'updateTaskStatus'])->name('tasks.update');
 
-    // 5. Fitur Selesai Proyek & Konfirmasi (Klien)
+    // 6. Fitur Selesai Proyek (Klien)
     Route::post('/jobs/{jobId}/complete', function($jobId) {
-        $job = \App\Models\Job::findOrFail($jobId);
-        $job->update(['status' => 'closed']);
+        Job::findOrFail($jobId)->update(['status' => 'closed']);
         return redirect()->back()->with('success', 'Mantap! Proyek berhasil diselesaikan.');
     })->name('jobs.complete');
 
-    // Review Fitur
-Route::post('/jobs/{jobId}/review', function(Illuminate\Http\Request $request, $jobId) {
-    $job = \App\Models\Job::findOrFail($jobId);
-    \App\Models\Review::create([
-        'job_id' => $jobId,
-        'freelancer_id' => $job->applications()->where('status', 'accepted')->first()->freelancer_id,
-        'rating' => $request->rating,
-        'comment' => $request->comment
-    ]);
-    return redirect()->back()->with('success', 'Review terkirim!');
-})->name('reviews.store');
+    // 7. Fitur Review
+    Route::post('/jobs/{jobId}/review', function(Request $request, $jobId) {
+        $job = Job::findOrFail($jobId);
+        Review::create([
+            'job_id' => $jobId,
+            'freelancer_id' => $job->applications()->where('status', 'accepted')->first()->freelancer_id,
+            'rating' => $request->rating,
+            'comment' => $request->comment
+        ]);
+        return redirect()->back()->with('success', 'Review terkirim!');
+    })->name('reviews.store');
 
-    // Fitur Seleksi Pelamar (Klien)
-    Route::patch('/applications/{id}/accept', [ApplicationController::class, 'accept'])->name('applications.accept');
-    Route::patch('/applications/{id}/reject', [ApplicationController::class, 'reject'])->name('applications.reject');
-
-    // Fitur Wallet (Riwayat Transaksi)
+    // 8. Fitur Wallet (Riwayat Transaksi)
     Route::get('/wallet', function() {
-        $transactions = Auth::user()->transactions()->with('job')->latest()->get();
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $transactions = $user->transactions()->with('job')->latest()->get();
         return view('wallet.index', compact('transactions'));
     })->name('wallet.index');
 
-    // Fitur Chat Internal
+    // 9. Fitur Chat Internal
     Route::get('/chat/{jobId}', [MessageController::class, 'showChat'])->name('chat.show');
     Route::post('/chat/{jobId}/send', [MessageController::class, 'sendMessage'])->name('chat.send');
 
+    // 10. Fitur Seleksi Pelamar (Klien)
+    Route::patch('/applications/{id}/accept', [ApplicationController::class, 'accept'])->name('applications.accept');
+    Route::patch('/applications/{id}/reject', [ApplicationController::class, 'reject'])->name('applications.reject');
 });
 
-// Route Admin: cuma bisa diakses admin
+// Route Khusus Admin
 Route::middleware(['auth', 'is_admin'])->group(function () {
     Route::get('/admin', [AdminController::class, 'index'])->name('admin.index');
     Route::delete('/admin/jobs/{id}', [AdminController::class, 'deleteJob'])->name('admin.delete_job');
