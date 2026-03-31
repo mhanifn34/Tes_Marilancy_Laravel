@@ -18,11 +18,15 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-    ];
+   protected $fillable = [
+    'name',
+    'email',
+    'password',
+    'role',           // Kolom role yang kita buat di awal
+    'bio',            // Kolom baru buat profil
+    'skills',         // Kolom baru buat skill
+    'portfolio_link', // Kolom baru buat link portofolio
+];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -45,5 +49,22 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    // Relasi ke Transactions
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    // Relasi ke Messages (sebagai sender atau receiver)
+    public function sentMessages()
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function receivedMessages()
+    {
+        return $this->hasMany(Message::class, 'receiver_id');
     }
 }
