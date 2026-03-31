@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Job;
 use App\Models\Task;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class WorkspaceController extends Controller
 {
@@ -16,7 +17,11 @@ class WorkspaceController extends Controller
         // Hitung progres (jumlah task 'done' / total task) * 100
         $totalTasks = $job->tasks->count();
         $doneTasks = $job->tasks->where('status', 'done')->count();
-        $progress = $totalTasks > 0 ? ($doneTasks / $totalTasks) * 100 : 0;
+        if ($totalTasks > 0) {
+            $progress = ($doneTasks / $totalTasks) * 100;
+        } else {
+            $progress = 0;
+        }
 
         return view('workspace.index', compact('job', 'progress'));
     }
